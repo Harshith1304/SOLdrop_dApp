@@ -16,7 +16,7 @@ import { NetworkContext } from '../context/NetworkContext';
 
 // --- Define your fee-receiving wallet address directly here ---
 // !!! IMPORTANT: REPLACE THIS WITH YOUR OWN WALLET ADDRESS !!!
-const FEE_RECIPIENT_ADDRESS = "YOUR_WALLET_ADDRESS_HERE";
+const FEE_RECIPIENT_ADDRESS = "8NyTspaqMyyvgKwF7cjkMnDjnN9BEjg4krF2cjmp4Lge";
 
 /**
  * Final Popup component for creating a new SPL Token.
@@ -78,7 +78,7 @@ const PopupTokenCreator = ({ onClose, onSuccess }) => {
             );
 
             if (network === 'mainnet-beta') {
-                if (FEE_RECIPIENT_ADDRESS === "YOUR_WALLET_ADDRESS_HERE" || !FEE_RECIPIENT_ADDRESS) {
+                if (FEE_RECIPIENT_ADDRESS === "8NyTspaqMyyvgKwF7cjkMnDjnN9BEjg4krF2cjmp4Lge" || !FEE_RECIPIENT_ADDRESS) {
                     throw new Error("Fee recipient address is not configured inside PopupTokenCreator.js");
                 }
                 const feeRecipient = new PublicKey(FEE_RECIPIENT_ADDRESS);
