@@ -2,42 +2,34 @@ import React, { useState } from 'react';
 import Head from 'next/head';
 import dynamic from 'next/dynamic';
 
-// Import all the modular components we have created
+// Import all the modular components with the correct, consistent names
 import Header from '../components/Header';
 import AiWaveHero from '../components/AiWaveHero';
 import HowToUseStep from '../components/HowToUseStep';
-import AiTool from '../components/AiTool';
+import AITool from '../components/AITool'; // Ensure this matches your filename
 import PopupTokenCreator from '../components/PopupTokenCreator';
 import AirdropPopup from '../components/AirdropPopup';
 import TokenMetadataPopup from '../components/TokenMetadataPopup';
 
-// Dynamically import the component that uses localStorage to prevent SSR issues
 const PopupLocalStorageToken = dynamic(
   () => import('../components/PopupLocalStorageToken'),
   { ssr: false }
 );
 
 const Home = () => {
-    // State management for all popups
     const [isTokenCreatorOpen, setTokenCreatorOpen] = useState(false);
     const [isAirdropOpen, setAirdropOpen] = useState(false);
     const [isMetadataPopupOpen, setMetadataPopupOpen] = useState(false);
     const [isStoragePopupOpen, setStoragePopupOpen] = useState(false);
     
-    // State to hold data for the success popup after token creation
     const [popupMetadata, setPopupMetadata] = useState({ mintAddress: '', metadataUri: '' });
 
-    /**
-     * This function is passed to the Token Creator.
-     * When a token is created successfully, this function is called.
-     * @param {{mintAddress: string, metadataUri: string}} data - The new token's data.
-     */
     const handleCreationSuccess = (data) => {
         setPopupMetadata({
             mintAddress: data.mintAddress,
             metadataUri: data.metadataUri,
         });
-        setMetadataPopupOpen(true); // This opens the success popup
+        setMetadataPopupOpen(true);
     };
 
     return (
@@ -54,14 +46,13 @@ const Home = () => {
             />
 
             <main className="container mx-auto p-4 py-8">
-                
                 <AiWaveHero />
-
                 <div className="my-16 max-w-4xl mx-auto">
                      <h2 className="text-3xl font-bold text-center mb-8 text-white">
                         Get Started with Our Tools
                      </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Ensure you are using <AITool />, which matches the import */}
                         <AITool
                             title="Token Creator"
                             description="Design and launch your SPL token with a custom name, symbol, and image."
@@ -94,33 +85,10 @@ const Home = () => {
             </footer>
 
             {/* POPUP RENDERING LOGIC */}
-            
-            {isTokenCreatorOpen && (
-                <PopupTokenCreator 
-                    onClose={() => setTokenCreatorOpen(false)} 
-                    onSuccess={handleCreationSuccess}
-                />
-            )}
-
-            {isAirdropOpen && (
-                <AirdropPopup 
-                    onClose={() => setAirdropOpen(false)} 
-                />
-            )}
-            
-            {isMetadataPopupOpen && (
-                <TokenMetadataPopup 
-                    mintAddress={popupMetadata.mintAddress}
-                    metadataUri={popupMetadata.metadataUri}
-                    onClose={() => setMetadataPopupOpen(false)}
-                />
-            )}
-
-            {isStoragePopupOpen && (
-                <PopupLocalStorageToken 
-                    onClose={() => setStoragePopupOpen(false)} 
-                />
-            )}
+            {isTokenCreatorOpen && <PopupTokenCreator onClose={() => setTokenCreatorOpen(false)} onSuccess={handleCreationSuccess} />}
+            {isAirdropOpen && <AirdropPopup onClose={() => setAirdropOpen(false)} />}
+            {isMetadataPopupOpen && <TokenMetadataPopup mintAddress={popupMetadata.mintAddress} metadataUri={popupMetadata.metadataUri} onClose={() => setMetadataPopupOpen(false)} />}
+            {isStoragePopupOpen && <PopupLocalStorageToken onClose={() => setStoragePopupOpen(false)} />}
         </div>
     );
 };
