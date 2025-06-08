@@ -1,53 +1,23 @@
-import React, { useMemo, useContext } from 'react';
-import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
-import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import {
-    PhantomWalletAdapter,
-    SolflareWalletAdapter,
-    TorusWalletAdapter,
-} from '@solana/wallet-adapter-wallets';
+import React from 'react';
+import dynamic from 'next/dynamic';
 
-// Import our new Network Provider
-import { NetworkProvider, NetworkContext } from '../context/NetworkContext';
-
+// Import the global CSS file
 import '../styles/globals.css';
-require('@solana/wallet-adapter-react-ui/styles.css');
+
+// --- THIS IS THE KEY ---
+// We dynamically import our new provider with SSR turned OFF.
+// This ensures it only ever runs in the browser.
+const WalletContextProvider = dynamic(() => import('../context/WalletContextProvider'), {
+    ssr: false,
+});
 
 
-// Create a new component that can access the context
-const AppWithProviders = ({ Component, pageProps }) => {
-    // Access the endpoint from our NetworkContext
-    const { endpoint } = useContext(NetworkContext);
-    
-    // We don't need the network constant from before, as it's handled by the context
-    const wallets = useMemo(
-        () => [
-            new PhantomWalletAdapter(),
-            new SolflareWalletAdapter(),
-            new TorusWalletAdapter(),
-        ],
-        [] // Dependency array is now empty
-    );
-
-    return (
-        <ConnectionProvider endpoint={endpoint}>
-            <WalletProvider wallets={wallets} autoConnect>
-                <WalletModalProvider>
-                    <Component {...pageProps} />
-                </WalletModalProvider>
-            </WalletProvider>
-        </ConnectionProvider>
-    );
-}
-
-
-// The main App component now just wraps everything with the NetworkProvider
 function MyApp({ Component, pageProps }) {
   return (
-    <NetworkProvider>
-        <AppWithProviders Component={Component} pageProps={pageProps} />
-    </NetworkProvider>
+    // We wrap our entire app with this single, client-side only provider.
+    <WalletContextProvider>
+        <Component {...pageProps} />
+    </WalletContextProvider>
   )
 }
 

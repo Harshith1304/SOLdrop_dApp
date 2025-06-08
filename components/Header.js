@@ -1,22 +1,12 @@
-import React, { useState, useEffect } from 'react'; // Import useState and useEffect
+import React, { useContext } from 'react'; // No longer need useState or useEffect
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { useContext } from 'react';
 import { NetworkContext } from '../context/NetworkContext';
 import { networks } from '../utils/networkConfig';
 
 const Header = ({ openTokenCreator, openAirdrop }) => {
     const { network, setNetwork } = useContext(NetworkContext);
 
-    // --- THIS IS THE FIX FOR BOTH ISSUES ---
-    // We create a state 'isMounted' to prevent server-side rendering of client-only components.
-    const [isMounted, setIsMounted] = useState(false);
-
-    // This useEffect hook runs only once in the browser after the component mounts.
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
-    // --- END OF FIX ---
-
+    // The isMounted state and useEffect are now removed!
 
     return (
         <header className="bg-gray-800 shadow-lg text-white p-4 flex justify-between items-center">
@@ -36,28 +26,23 @@ const Header = ({ openTokenCreator, openAirdrop }) => {
                 >
                     Airdrop
                 </button>
+                
+                {/* We can now render these directly without the isMounted check */}
+                <div className="ml-4">
+                    <select
+                        value={network}
+                        onChange={(e) => setNetwork(e.target.value)}
+                        className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                        {Object.keys(networks).map((net) => (
+                            <option key={net} value={net}>
+                                {networks[net].name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <WalletMultiButton style={{ backgroundColor: '#6d28d9' }} />
 
-                {/* --- THIS IS ALSO PART OF THE FIX --- */}
-                {/* We only render the wallet button and network switcher if isMounted is true. */}
-                {/* This guarantees they won't be rendered on the server, avoiding the mismatch. */}
-                {isMounted && (
-                    <>
-                        <div className="ml-4">
-                            <select
-                                value={network}
-                                onChange={(e) => setNetwork(e.target.value)}
-                                className="bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            >
-                                {Object.keys(networks).map((net) => (
-                                    <option key={net} value={net}>
-                                        {networks[net].name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <WalletMultiButton style={{ backgroundColor: '#6d28d9' }} />
-                    </>
-                )}
             </nav>
         </header>
     );
