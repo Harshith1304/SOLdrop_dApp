@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import Header from '../components/Header';
 import AiWaveHero from '../components/AiWaveHero';
 import HowToUseStep from '../components/HowToUseStep';
-import AITool from '../components/AITool';
+import AiTool from '../components/AiTool';
 import PopupTokenCreator from '../components/PopupTokenCreator';
 import AirdropPopup from '../components/AirdropPopup';
 import TokenMetadataPopup from '../components/TokenMetadataPopup';

@@ -1,6 +1,6 @@
 import React from 'react';
 
-const AITool = ({ title, description, onClick, buttonText }) => {
+const AiTool = ({ title, description, onClick, buttonText }) => {
   return (
     <div className="bg-gray-800 p-6 rounded-lg text-center">
       <h3 className="text-xl font-semibold mb-2 text-white">{title}</h3>
@@ -15,4 +15,4 @@ const AITool = ({ title, description, onClick, buttonText }) => {
   );
 };
 
-export default AITool;
+export default AiTool;
