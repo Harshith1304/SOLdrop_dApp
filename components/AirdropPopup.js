@@ -1,8 +1,8 @@
-import React, { useCallback, useState, useContext, useEffect } from 'react'; // Import useEffect
+import React, { useCallback, useState, useContext, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, getAccount, getMint } from '@solana/spl-token';
-import { Metadata } from '@metaplex-foundation/mpl-token-metadata'; // NEW: Import Metaplex Metadata
+import { Metadata } from '@metaplex-foundation/mpl-token-metadata';
 import { NetworkContext } from '../context/NetworkContext';
 import { PLATFORM_FEE_WALLET_ADDRESS, PLATFORM_FEE_LAMPORTS } from '../utils/constants';
 
@@ -11,61 +11,59 @@ const AirdropPopup = ({ onClose }) => {
     const { publicKey, sendTransaction } = useWallet();
     const { network } = useContext(NetworkContext);
 
-    // --- Existing State ---
     const [tokenMintAddress, setTokenMintAddress] = useState('');
     const [recipientData, setRecipientData] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [overallMessage, setOverallMessage] = useState('');
     const [processedRecipients, setProcessedRecipients] = useState([]);
-
-    // --- NEW STATE FOR OWNED TOKENS ---
+    
     const [ownedTokens, setOwnedTokens] = useState([]);
     const [isFetchingTokens, setIsFetchingTokens] = useState(false);
 
-    // --- NEW: useEffect TO FETCH USER'S TOKENS ---
     useEffect(() => {
         const fetchOwnedTokens = async () => {
             if (!publicKey) return;
 
             setIsFetchingTokens(true);
             try {
-                // Get all token accounts for the connected wallet
                 const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
                     programId: TOKEN_PROGRAM_ID,
                 });
 
-                // Filter out accounts with no balance and NFTs
                 const fungibleTokens = tokenAccounts.value.filter(account => {
                     const amount = account.account.data.parsed.info.tokenAmount;
-                    return amount.decimals > 0 && parseInt(amount.uiAmountString) > 0;
+                    return amount.decimals > 0 && Number(amount.uiAmount) > 0;
                 });
                 
-                // Fetch metadata for each token to get its name and symbol
-                const tokenData = await Promise.all(fungibleTokens.map(async (acc) => {
+                const tokenDataPromises = fungibleTokens.map(async (acc) => {
+                    const mintAddress = acc.account.data.parsed.info.mint;
+                    const mintPublicKey = new PublicKey(mintAddress);
+                    let tokenName = 'Unknown Token';
+                    let tokenSymbol = mintAddress.slice(0, 4) + '...';
+
                     try {
-                        const mint = new PublicKey(acc.account.data.parsed.info.mint);
-                        const pda = await Metadata.getPDA(mint);
-                        const metadata = await Metadata.fromAccountAddress(connection, pda);
-                        
-                        return {
-                            name: metadata.data.name.replace(/\0/g, ''), // Remove null characters
-                            symbol: metadata.data.symbol.replace(/\0/g, ''),
-                            mint: mint.toBase58(),
-                            balance: acc.account.data.parsed.info.tokenAmount.uiAmountString,
+                        const metadataPDA = await Metadata.getPDA(mintPublicKey);
+                        const metadataAccount = await connection.getAccountInfo(metadataPDA);
+                        if (metadataAccount) {
+                            const metadata = await Metadata.fromAccountAddress(connection, metadataPDA);
+                            tokenName = metadata.data.name.replace(/\0/g, '');
+                            tokenSymbol = metadata.data.symbol.replace(/\0/g, '');
                         }
                     } catch (e) {
-                        // Could not fetch metadata, use mint address as a fallback
-                        console.warn(`Could not fetch metadata for mint ${acc.account.data.parsed.info.mint}: `, e);
-                        return {
-                            name: 'Unknown Token',
-                            symbol: acc.account.data.parsed.info.mint.slice(0, 6) + '...',
-                            mint: acc.account.data.parsed.info.mint,
-                            balance: acc.account.data.parsed.info.tokenAmount.uiAmountString,
-                        };
+                        console.warn(`Could not fetch metadata for mint ${mintAddress}:`, e);
                     }
-                }));
+                    
+                    return {
+                        name: tokenName,
+                        symbol: tokenSymbol,
+                        mint: mintAddress,
+                        balance: acc.account.data.parsed.info.tokenAmount.uiAmountString,
+                    };
+                });
 
-                setOwnedTokens(tokenData);
+                const settledTokenData = await Promise.all(tokenDataPromises);
+                setOwnedTokens(settledTokenData);
+
             } catch (error) {
                 console.error("Failed to fetch owned tokens:", error);
                 setOverallMessage("Error: Could not fetch your tokens.");
@@ -77,9 +75,102 @@ const AirdropPopup = ({ onClose }) => {
         fetchOwnedTokens();
     }, [publicKey, connection]);
 
+    const handleAirdrop = useCallback(async () => {
+        if (!publicKey || !tokenMintAddress || !recipientData) {
+            setOverallMessage('Please fill in all fields.');
+            return;
+        }
 
-    // handleAirdrop function remains the same...
-    const handleAirdrop = useCallback(async () => { /* ... */ }, [/* ... */]);
+        console.log("--- Starting Airdrop ---");
+        setIsLoading(true);
+        setOverallMessage('Starting airdrop...');
+        setProcessedRecipients([]);
+
+        try {
+            const mintPublicKey = new PublicKey(tokenMintAddress);
+            console.log("Fetching mint info for:", mintPublicKey.toBase58());
+            const mintInfo = await getMint(connection, mintPublicKey);
+            const decimals = mintInfo.decimals;
+
+            const recipients = recipientData.split('\n').map(line => {
+                const [address, amount] = line.split(',').map(s => s.trim());
+                if (!address || isNaN(parseFloat(amount))) return null;
+                return { address, amount: parseFloat(amount) };
+            }).filter(r => r !== null);
+
+            if (recipients.length === 0) {
+                throw new Error("No valid recipients found in the data.");
+            }
+            console.log(`Found ${recipients.length} valid recipients.`);
+            
+            const sourceATA = await getAssociatedTokenAddress(mintPublicKey, publicKey);
+            console.log("Sender's Token Account (ATA):", sourceATA.toBase58());
+
+            const transactions = [];
+            let currentTransaction = new Transaction();
+            const recipientsPerTx = 10; // Batching to avoid oversized transactions
+
+            for (let i = 0; i < recipients.length; i++) {
+                const recipient = recipients[i];
+                setOverallMessage(`Processing recipient ${i + 1}/${recipients.length}...`);
+                console.log(`Processing ${recipient.address} for ${recipient.amount} tokens.`);
+
+                const recipientPublicKey = new PublicKey(recipient.address);
+                const destinationATA = await getAssociatedTokenAddress(mintPublicKey, recipientPublicKey);
+
+                const destinationAccountInfo = await connection.getAccountInfo(destinationATA);
+                if (!destinationAccountInfo) {
+                    console.log(`Recipient ${recipient.address} does not have a token account. Creating one.`);
+                    currentTransaction.add(
+                        createAssociatedTokenAccountInstruction(publicKey, destinationATA, recipientPublicKey, mintPublicKey)
+                    );
+                }
+                
+                currentTransaction.add(
+                    createTransferInstruction(
+                        sourceATA,
+                        destinationATA,
+                        publicKey,
+                        BigInt(recipient.amount * Math.pow(10, decimals))
+                    )
+                );
+
+                if ((i + 1) % recipientsPerTx === 0 || i === recipients.length - 1) {
+                    transactions.push(currentTransaction);
+                    currentTransaction = new Transaction();
+                }
+            }
+
+            if (network === 'mainnet-beta' && transactions.length > 0) {
+                if (PLATFORM_FEE_WALLET_ADDRESS === "YOUR_WALLET_ADDRESS_HERE" || !PLATFORM_FEE_WALLET_ADDRESS) {
+                     throw new Error("Fee recipient address is not configured in utils/constants.js");
+                }
+                const feeRecipient = new PublicKey(PLATFORM_FEE_WALLET_ADDRESS);
+                // Add fee to the first transaction only
+                transactions[0].instructions.unshift(SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: feeRecipient, lamports: PLATFORM_FEE_LAMPORTS }));
+            }
+            
+            console.log(`Sending ${transactions.length} transaction(s) in total.`);
+            setOverallMessage(`Awaiting approval for ${transactions.length} transaction(s)...`);
+
+            const signedTransactions = await sendTransaction(transactions, connection);
+            
+            setOverallMessage('Transactions sent! Confirming...');
+            for (const signature of signedTransactions) {
+                await connection.confirmTransaction(signature, 'confirmed');
+                console.log("Confirmed transaction:", signature);
+            }
+
+            setOverallMessage('Airdrop completed successfully!');
+            setProcessedRecipients(recipients.map(r => ({ ...r, status: 'Success' })));
+
+        } catch (error) {
+            console.error('Airdrop failed:', error);
+            setOverallMessage(`Airdrop failed: ${error.message}`);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [publicKey, connection, sendTransaction, tokenMintAddress, recipientData, network]);
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
@@ -88,12 +179,10 @@ const AirdropPopup = ({ onClose }) => {
                     <h2 className="text-2xl font-bold">Airdrop Tokens</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
                 </div>
-
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
                     <div>
                         <label className="block text-sm font-medium text-gray-300">Select Token from Wallet or Enter Address</label>
                         <div className="flex items-center space-x-2 mt-1">
-                            {/* --- NEW: TOKEN DROPDOWN --- */}
                             <select
                                 onChange={(e) => setTokenMintAddress(e.target.value)}
                                 disabled={isFetchingTokens || ownedTokens.length === 0}
@@ -102,13 +191,11 @@ const AirdropPopup = ({ onClose }) => {
                                 <option value="">{isFetchingTokens ? "Loading your tokens..." : "Select a token"}</option>
                                 {ownedTokens.map((token) => (
                                     <option key={token.mint} value={token.mint}>
-                                        {token.name} ({token.symbol})
+                                        {token.name} ({token.symbol}) - Bal: {token.balance}
                                     </option>
                                 ))}
                             </select>
-
                             <span className="text-gray-400">OR</span>
-
                             <input
                                 type="text"
                                 value={tokenMintAddress}
@@ -133,11 +220,23 @@ const AirdropPopup = ({ onClose }) => {
                     </div>
                 </div>
 
-                {/* The rest of the component (fee notification, button, status display) remains the same */}
-                {/* ... */}
+                {network === 'mainnet-beta' && (
+                    <div className="mt-4 p-2 text-center text-xs rounded bg-yellow-900 text-yellow-200">
+                        A platform fee of <strong>{PLATFORM_FEE_LAMPORTS / LAMPORTS_PER_SOL} SOL</strong> will be applied on Mainnet.
+                    </div>
+                )}
+                
+                <button onClick={handleAirdrop} className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50" disabled={isLoading || !publicKey}>
+                    {isLoading ? overallMessage : 'Start Airdrop'}
+                </button>
+                
+                {overallMessage && !isLoading && (
+                    <div className="mt-4 p-2 text-center text-sm rounded bg-gray-700">
+                        <p>{overallMessage}</p>
+                    </div>
+                )}
             </div>
         </div>
     );
 };
-
 export default AirdropPopup;
