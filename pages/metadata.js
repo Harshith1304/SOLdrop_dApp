@@ -4,8 +4,8 @@ import dynamic from 'next/dynamic';
 import Header from '../components/Header';
 
 // Dynamically import the main view with SSR turned off
-const MetadataView = dynamic(
-  () => import('../components/MetadataView'),
+const MetaDataView = dynamic(
+  () => import('../components/MetaDataView'),
   { ssr: false }
 );
 

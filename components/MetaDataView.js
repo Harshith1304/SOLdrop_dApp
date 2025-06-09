@@ -4,7 +4,7 @@ import { PublicKey } from '@solana/web3.js';
 import { Metadata } from '@metaplex-foundation/mpl-token-metadata';
 import Image from 'next/image';
 
-const MetadataView = () => {
+const MetaDataView = () => {
     const { connection } = useConnection();
     const [mintAddress, setMintAddress] = useState('');
     const [metadata, setMetadata] = useState(null);
@@ -17,4 +17,4 @@ const MetadataView = () => {
     );
 };
 
-export default MetadataView;
+export default MetaDataView;
