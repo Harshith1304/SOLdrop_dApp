@@ -16,11 +16,8 @@ const MetadataPage = () => {
                 <title>SOLdrop - Token Metadata</title>
                 <meta name="description" content="Inspect SPL Token Metadata on Solana." />
             </Head>
-            {/* We pass dummy functions because this page doesn't need to open popups */}
             <Header openTokenCreator={() => {}} openAirdrop={() => {}} />
-            
             <MetadataView />
-
         </div>
     );
 };
