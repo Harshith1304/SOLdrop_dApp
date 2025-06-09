@@ -1,31 +1,28 @@
-// ... All the imports remain the same ...
+import React from 'react';
+import Head from 'next/head';
+import dynamic from 'next/dynamic';
 import Header from '../components/Header';
-import React, { useState } from 'react';
-// ... other imports
 
-const MetadataPage = () => { // Renamed from Inspector
-    // ... All the logic inside the component remains exactly the same
-    const { connection } = useConnection();
-    const [mintAddress, setMintAddress] = useState('');
-    // ... all other states and the handleFetchMetadata function ...
+// Dynamically import the main view with SSR turned off
+const MetadataView = dynamic(
+  () => import('../components/MetadataView'),
+  { ssr: false }
+);
 
+const MetadataPage = () => {
     return (
         <div className="bg-gray-900 min-h-screen text-white">
             <Head>
-                <title>SOLdrop - Token Metadata</title> {/* Changed Title */}
+                <title>SOLdrop - Token Metadata</title>
                 <meta name="description" content="Inspect SPL Token Metadata on Solana." />
             </Head>
-            {/* We pass dummy functions because this page doesn't open popups */}
-            <Header openTokenCreator={() => {}} openAirdrop={() => {}} /> 
+            {/* We pass dummy functions because this page doesn't need to open popups */}
+            <Header openTokenCreator={() => {}} openAirdrop={() => {}} />
+            
+            <MetadataView />
 
-            <main className="container mx-auto p-4 py-8">
-                <div className="max-w-xl mx-auto text-center">
-                    <h1 className="text-4xl font-bold mb-4">Token Metadata</h1> {/* Changed Title */}
-                    {/* ... The rest of the JSX remains the same ... */}
-                </div>
-            </main>
         </div>
     );
 };
 
-export default MetadataPage; // Renamed from Inspector
+export default MetadataPage;
